@@ -6,7 +6,7 @@ package z.core
 		{
 		}
 		
-		public static const row:int = 10;
+		public static const row:int = 9; 
 		public static const column:int = 10;
 		
 		public static const W:Number = 32;
