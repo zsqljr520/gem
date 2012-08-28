@@ -13,7 +13,7 @@ package z.core
 		
 		public function GemCell() {
 			super();
-			this.createChildren();
+			this.redraw();
 			this.configEvent();
 		}
 		
@@ -37,12 +37,21 @@ package z.core
 		public var cellX:int;
 		public var cellY:int;
 		
-		//private var colors:Array = [0xFFFFFF,0x99FFBB,0x22CCAA,0xBBCC22,0xFFDDFF,0xFFFFFF,0xCCDDEE];
-		private var colors:Array = [0xFFFFFF,0x99FFBB,0x22CCAA];
-		public var color:uint;
-		private function createChildren():void {
-			var index:int = Math.floor(Math.random() * colors.length);
-			color = colors[index];
+		
+		private var _color:uint;
+		
+		public function set color(value:uint):void {
+			if(this._color != value){
+				this._color = value;
+				this.redraw();
+			}
+		}
+		
+		public function get color():uint {
+			return this._color;
+		}
+		
+		private function redraw():void {
 			var g:Graphics = this.graphics;
 			g.clear();
 			g.beginFill(color);
@@ -50,6 +59,8 @@ package z.core
 			g.drawRect(0,0,Config.W,Config.H);
 			g.endFill();
 		}
+		
+		
 		
 		public function dispose():void {
 			while(this.numChildren > 0){
@@ -66,8 +77,11 @@ package z.core
 			if(this.cellY == 0) {
 				this.y = -1 * Config.H;
 			}
-			TweenLite.to(this,0.25,{y:this.cellY * Config.H,ease:Cubic.easeIn});
+			TweenLite.to(this,0.2,{y:this.cellY * Config.H,ease:Cubic.easeIn,onComplete:onComplete});
 			model.setItem(cellX,cellY,this);
+		}
+		
+		public function onComplete():void {
 		}
 	}
 }

@@ -22,10 +22,16 @@ package z.core
 		
 		public static const DIRECTION_OWNER:int = 4;// 当前点击的
 		
-		public static const MIN_REMOVED_COUNT:int = 2;// N个才能消除
+		public static const MIN_REMOVED_COUNT:int = 1;// N个才能消除
 		
 		public static const H_DIRECTION:int = 1 << 4;
 		public static const V_DIRECTION:int = 2 << 4;
+		
+		public static const MIN_CLEAR_UP_LINE:int = 2;
+		
+		
+		//public static var colors:Array = [0xFFFFFF,0x99FFBB,0x22CCAA,0xBBCC22,0xFFDDFF,0xFFFFFF,0xCCDDEE,0xFFBB22,0xEECCDD,0xAABB55,0xBBCCDD];
+		public static var colors:Array = [0xFFFFFF,0x99FFBB,0x22CCAA];
 
 	}
 }

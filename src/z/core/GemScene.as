@@ -2,10 +2,15 @@ package z.core
 {
 	import flash.display.Sprite;
 	import flash.events.MouseEvent;
+	import flash.utils.Dictionary;
+	
+	import z.utils.DisplayUtil;
 
 	public class GemScene extends Sprite implements IDispose
 	{
 		private var model:GameModel = GameModel.instance;
+		
+		private var dictionary:Dictionary = new Dictionary(true);// 检测死局的数据
 		
 		public function GemScene()
 		{
@@ -22,31 +27,54 @@ package z.core
 		private function checkCellHandler(event:MouseEvent):void {
 			var cell:GemCell = event.target as GemCell;
 			if(cell){
-				trace("cell.cellX : " + cell.cellX + ", cell.cellY : " + cell.cellY);
-				cells = [];
-				var vLineCells:Array = [];
-				var hLineCells:Array = [];
-				var items:Array = this.getAroundCell(cell);
-				var item:CellItem;
-				for each(item in items){
-					if(item.direction == Config.DIRECTION_LEFT || item.direction == Config.DIRECTION_RIGHT){
-						if(item.cell.cellY == cell.cellY && hLineCells.indexOf(item.cell) == -1){
-							hLineCells.push(item.cell);
-						}
-					}else if(item.direction == Config.DIRECTION_TOP || item.direction == Config.DIRECTION_BOTTOM) {
-						if(item.cell.cellX == cell.cellX && vLineCells.indexOf(item.cell) == -1){
-							vLineCells.push(item.cell);
-						}
-					}
-				}
-				//this.rebuild(hLineCells,Config.H_DIRECTION);
-				this.rebuild(vLineCells,Config.V_DIRECTION);
+				this.checkCell(cell);
 			}
 		}
 		
-		private function rebuild(v:Array,direction:int):void {
-			var cell:GemCell;
-			if(v.length >= Config.MIN_REMOVED_COUNT){
+		public function checkCell(cell:GemCell):void {
+			trace("cell.cellX : " + cell.cellX + ",cell.cellY : " + cell.cellY);
+			var object:Object = this.getLineCells(cell);
+			var hLineCells:Array = object.h;
+			var vLineCells:Array = object.v;
+			var buildable:Boolean;
+			if(hLineCells.length >= Config.MIN_REMOVED_COUNT && vLineCells.length >= Config.MIN_REMOVED_COUNT){// 会有同样的一个数据在里面
+				buildable = true;
+				for(var i:int = 0; i < hLineCells.length; i++){
+					var target:GemCell = hLineCells[i];
+					if(target == cell){
+						hLineCells.splice(i,1);
+					}
+				}
+			}
+			this.rebuild(vLineCells,Config.V_DIRECTION);
+			this.rebuild(hLineCells,Config.H_DIRECTION);
+			this.replace();
+			trace("this.numChildren : " + this.numChildren);
+		}
+		
+		private function getLineCells(cell:GemCell):Object {
+			cells = [];
+			var vLineCells:Array = [];
+			var hLineCells:Array = [];
+			var items:Array = this.getAroundCell(cell);
+			var item:CellItem;
+			for each(item in items){
+				if(item.direction == Config.DIRECTION_LEFT || item.direction == Config.DIRECTION_RIGHT){
+					if(item.cell.cellY == cell.cellY && hLineCells.indexOf(item.cell) == -1){
+						hLineCells.push(item.cell);
+					}
+				}else if(item.direction == Config.DIRECTION_TOP || item.direction == Config.DIRECTION_BOTTOM) {
+					if(item.cell.cellX == cell.cellX && vLineCells.indexOf(item.cell) == -1){
+						vLineCells.push(item.cell);
+					}
+				}
+			}
+			return {h:hLineCells,v:vLineCells};
+		}
+		
+		private function rebuild(v:Array,direction:int,buildable:Boolean = false):void {
+			if(v.length >= Config.MIN_REMOVED_COUNT || buildable){
+				var cell:GemCell;
 				if(direction == Config.V_DIRECTION){
 					v.sort(compareFunc);
 				}
@@ -60,11 +88,12 @@ package z.core
 		
 		private function createChildren():void {
 			var startY:Number = 0;
+			var cell:GemCell;
 			for(var i:int = 0; i < Config.row; i++){
 				startY = i * Config.H;
 				var startX:Number = 0;
 				for(var j:int = 0; j < Config.column; j++){
-					var cell:GemCell = new GemCell();
+					cell = this.generateGemCell();
 					startX = j * Config.W;
 					cell.x = startX;
 					cell.y = startY;
@@ -76,9 +105,10 @@ package z.core
 					this.addChild(cell);
 				}
 			}
+			this.replace();
 		}
 		
-		public function hasObject(list:Array,cellItem:CellItem):Boolean {
+		public function hasObject(cellItem:CellItem):Boolean {
 			for(var i:int = 0; i < cells.length; i++){
 				var item:CellItem = cells[i];
 				if(item.equal(cellItem)){
@@ -97,7 +127,7 @@ package z.core
 			return 0;
 		}
 		
-		private var cells:Array;
+		private var cells:Array = [];
 		
 		private var directions:Array = [new WalkDirection(-1,0,Config.DIRECTION_LEFT),
 											new WalkDirection(1,0,Config.DIRECTION_RIGHT),
@@ -111,7 +141,7 @@ package z.core
 				var yIndex:int = cell.cellY + walkDirection.offsetY;
 				var gemCell:GemCell = model.getItem(xIndex,yIndex);
 				var cellItem:CellItem = new CellItem(walkDirection.direction,gemCell); 
-				if(gemCell && !this.hasObject(this.cells,cellItem) && gemCell.color == cell.color){
+				if(gemCell && !this.hasObject(cellItem) && gemCell.color == cell.color){
 					cells.push(cellItem);
 					this.getAroundCell(gemCell);
 				}
@@ -120,13 +150,66 @@ package z.core
 		}
 		
 		public function dispose():void {
-			this.removeAllChildren();
+			this.removeEventListener(MouseEvent.CLICK,checkCellHandler);
+			DisplayUtil.removeAllChildren(this);
 		}
 		
-		public function removeAllChildren():void {
-			while(this.numChildren > 0){
-				this.removeChildAt(0);
-			} 
+		private function generateGemCell():GemCell {
+			var cell:GemCell = new GemCell();
+			var index:int = Math.floor(Math.random() * Config.colors.length);
+			cell.color = Config.colors[index];
+			return cell;
+		}
+		
+		/**
+		 * 生成新的数据
+		 */ 
+		public function replace():void {
+			/* if(this.checkIsStalemate(0,0)){
+				var cell:GemCell;
+				for(var i:int = 0; i < Config.MIN_CLEAR_UP_LINE; i++){
+					var cellX:int = MathUtil.random(1,Config.column - 1);
+					var cellY:int = MathUtil.random(1,Config.row - 1);
+					cell = model.getItem(cellX,cellY);
+					var leftCell:GemCell = model.getItem(cellX - 1,cellY);
+					if(leftCell){
+						leftCell.color = cell.color;
+					}
+					var rightCell:GemCell = model.getItem(cellX + 1,cellY);
+					if(rightCell){
+						rightCell.color = cell.color;
+					}
+				}
+			} */
+		}
+		
+		/**
+		 * 检测是否是死局
+		 */ 
+		public function checkIsStalemate(cellX:int,cellY:int):Boolean {
+			for(var i:int = 0; i < model.items.length; i++){// 先把数据分组
+				var list:Array = model.items[i];
+				for(var j:int = 0; j < list.length; j++){
+					var item:GemCell = list[i];
+					if(this.dictionary[item.color] == null){
+						this.dictionary[item.color] = new Group(item.color);
+					}
+					Group(this.dictionary[item.color]).addItem(item);
+				}
+			}
+			for(var key:* in dictionary){
+				var group:Group = dictionary[key];
+				if(group.checkEnabled){
+					for each(var cell:GemCell in group.list){
+						var object:Object = this.getLineCells(cell);
+						if(object.h.length >= Config.MIN_REMOVED_COUNT ||
+							object.v.length >= Config.MIN_REMOVED_COUNT){
+							return false;
+						}
+					}
+				}
+			}
+			return true;
 		}
 		
 		public function relocation(list:Array,direction:int):void {
@@ -140,23 +223,28 @@ package z.core
 					var yIndex:int = i;
 					newCell = model.getItem(xIndex,yIndex - count);
 					if(!newCell){
-						newCell = new GemCell();
+						newCell = this.generateGemCell();
 						newCell.x = xIndex * Config.W;
 						this.addChild(newCell);
 					}
-					newCell.tween(xIndex,yIndex);
+					if(newCell){
+						newCell.tween(xIndex,yIndex);
+					}
+					 
 				}
-			}else {
+			}else { 
 				for(; i < list.length; i++){
 					var cell:GemCell = list[i];
-					for(var j:int = cell.cellY; j >= 0; j--) {
+					for(var j:int = cell.cellY; j >= 0; j--) { 
 						newCell = model.getItem(cell.cellX,j - 1);
 						if(!newCell){
-							newCell = new GemCell();
+							newCell = this.generateGemCell();
 							newCell.x = cell.x;
 							this.addChild(newCell);
 						}
-						newCell.tween(cell.cellX,j);
+						if(newCell){
+							newCell.tween(cell.cellX,j);
+						}
 					}
 				}
 			}
@@ -166,6 +254,7 @@ package z.core
 
 import flash.geom.Point;
 import z.core.GemCell;
+import z.core.Config;
 
 class CellItem {
 	
@@ -201,4 +290,22 @@ class WalkDirection {
 		this.direction = diretion;
 	}
 	
+}
+
+class Group {
+	public var key:*;
+	
+	public var list:Array = [];
+	
+	public function Group(key:*) {
+		this.key = key;
+	}
+	
+	public function addItem(value:*):void {
+		list.push(value);
+	}
+	
+	public function get checkEnabled():Boolean {
+		return this.list.length >= Config.MIN_REMOVED_COUNT;
+	}
 }
